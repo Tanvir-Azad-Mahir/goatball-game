@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GOATBALL - Multiplayer Game</title>
+  <link rel="icon" href="logo.png">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #111; color: white; font-family: sans-serif; }
+    canvas { display: block; margin: auto; background: #222; border: 2px solid white; }
+    #status { text-align: center; margin: 10px 0; font-size: 1.2em; }
+  </style>
+</head>
+<body>
+  <h1 style="text-align:center;margin:20px 0;font-size:3em">GOATBALL</h1>
+  <div id="status">Connecting...</div>
+  <canvas id="gameCanvas" width="800" height="600"></canvas>
+  <audio id="bgMusic" src="bg-music.mp3" loop autoplay></audio>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-database-compat.js"></script>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyDZKNVQdGzTueZbK5jChZuqiRzvK1gX86A",
+      authDomain: "goatball-game.firebaseapp.com",
+      databaseURL: "https://goatball-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "goatball-game",
+      storageBucket: "goatball-game.firebasestorage.app",
+      messagingSenderId: "621184699963",
+      appId: "1:621184699963:web:6399b341b5fbe9e732161e",
+      measurementId: "G-358X62JHSM"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+  </script>
+
+  <script>
+    const canvas = document.getElementById("gameCanvas");
+    const ctx = canvas.getContext("2d");
+    const statusDiv = document.getElementById("status");
+
+    const playerId = Math.random().toString(36).substring(2);
+    const playerColor = '#' + Math.floor(Math.random()*16777215).toString(16);
+
+    const playerRef = db.ref("players/" + playerId);
+    const playersRef = db.ref("players");
+
+    let players = {};
+    let x = Math.random() * 700 + 50;
+    let y = Math.random() * 500 + 50;
+    let vx = 0, vy = 0;
+
+    const speed = 3;
+
+    document.addEventListener("keydown", e => {
+      if (e.key === "ArrowUp") vy = -speed;
+      if (e.key === "ArrowDown") vy = speed;
+      if (e.key === "ArrowLeft") vx = -speed;
+      if (e.key === "ArrowRight") vx = speed;
+    });
+
+    document.addEventListener("keyup", e => {
+      if (e.key === "ArrowUp" || e.key === "ArrowDown") vy = 0;
+      if (e.key === "ArrowLeft" || e.key === "ArrowRight") vx = 0;
+    });
+
+    function gameLoop() {
+      x += vx;
+      y += vy;
+
+      playerRef.set({ x, y, color: playerColor });
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const id in players) {
+        const p = players[id];
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, 10, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    playersRef.on("value", snapshot => {
+      players = snapshot.val() || {};
+    });
+
+    playerRef.onDisconnect().remove();
+
+    statusDiv.innerText = "Connected as Player " + playerId.slice(0, 5);
+    gameLoop();
+  </script>
+</body>
+</html>
