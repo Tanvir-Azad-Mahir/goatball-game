@@ -7,8 +7,8 @@
   <link rel="icon" href="logo.png">
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; background: #111; color: white; font-family: sans-serif; }
-    canvas { display: block; margin: auto; background: #222; border: 2px solid white; }
+    html, body { height: 100%; background: url('arena-bg.jpg') no-repeat center center fixed; background-size: cover; color: white; font-family: sans-serif; }
+    canvas { display: block; margin: auto; background: rgba(0,0,0,0.4); border: 2px solid white; }
     #status { text-align: center; margin: 10px 0; font-size: 1.2em; }
   </style>
 </head>
@@ -47,13 +47,17 @@
 
     const playerRef = db.ref("players/" + playerId);
     const playersRef = db.ref("players");
+    const powerupsRef = db.ref("powerups");
 
     let players = {};
+    let powerups = {};
     let x = Math.random() * 700 + 50;
     let y = Math.random() * 500 + 50;
     let vx = 0, vy = 0;
 
-    const speed = 3;
+    let speed = 3;
+    let score = 0;
+    let powerupTimer = 0;
 
     document.addEventListener("keydown", e => {
       if (e.key === "ArrowUp") vy = -speed;
@@ -67,13 +71,27 @@
       if (e.key === "ArrowLeft" || e.key === "ArrowRight") vx = 0;
     });
 
+    function spawnPowerup() {
+      const types = ["slowed", "faster", "2x", "magnet"];
+      const type = types[Math.floor(Math.random() * types.length)];
+      const pu = {
+        x: Math.random() * 760 + 20,
+        y: Math.random() * 560 + 20,
+        type
+      };
+      powerupsRef.push(pu);
+    }
+
+    setInterval(spawnPowerup, 10000);
+
     function gameLoop() {
       x += vx;
       y += vy;
 
-      playerRef.set({ x, y, color: playerColor });
+      playerRef.set({ x, y, color: playerColor, score });
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+      // Draw players
       for (const id in players) {
         const p = players[id];
         ctx.fillStyle = p.color;
@@ -82,11 +100,43 @@
         ctx.fill();
       }
 
+      // Draw powerups
+      for (const id in powerups) {
+        const p = powerups[id];
+        ctx.fillStyle = {
+          slowed: "cyan",
+          faster: "lime",
+          "2x": "gold",
+          magnet: "magenta"
+        }[p.type] || "white";
+        ctx.fillRect(p.x - 5, p.y - 5, 10, 10);
+
+        // Collision detection
+        if (Math.hypot(p.x - x, p.y - y) < 15) {
+          if (p.type === "slowed") speed = 1.5;
+          if (p.type === "faster") speed = 5;
+          if (p.type === "2x") score += 2;
+          if (p.type === "magnet") score += 1; // placeholder effect
+          powerupTimer = 300;
+          db.ref("powerups/" + id).remove();
+        }
+      }
+
+      // Powerup timer logic
+      if (powerupTimer > 0) {
+        powerupTimer--;
+        if (powerupTimer === 0) speed = 3;
+      }
+
       requestAnimationFrame(gameLoop);
     }
 
     playersRef.on("value", snapshot => {
       players = snapshot.val() || {};
+    });
+
+    powerupsRef.on("value", snapshot => {
+      powerups = snapshot.val() || {};
     });
 
     playerRef.onDisconnect().remove();
